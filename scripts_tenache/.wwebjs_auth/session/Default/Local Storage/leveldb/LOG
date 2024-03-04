@@ -1,0 +1,6 @@
+2024/02/29-17:36:52.329 38ec Reusing MANIFEST C:\Users\tenache89\Desktop\llama.cpp\build\bin\Release\scripts\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2024/02/29-17:36:52.329 38ec Recovering log #23
+2024/02/29-17:36:52.330 38ec Reusing old log C:\Users\tenache89\Desktop\llama.cpp\build\bin\Release\scripts\.wwebjs_auth\session\Default\Local Storage\leveldb/000023.log 
+2024/02/29-17:47:09.913 3cc0 Level-0 table #27: started
+2024/02/29-17:47:09.919 3cc0 Level-0 table #27: 17166 bytes OK
+2024/02/29-17:47:09.920 3cc0 Delete type=0 #23
