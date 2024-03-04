@@ -39,7 +39,7 @@ client.on('message', (message) => {
 
 
 const sqlite3 = require('sqlite3').verbose();
-const database_path = './whatsapp2.db'
+const database_path = './whatsapp3.db'
 const db = new sqlite3.Database(database_path, (err) => {
     if (err) {
         console.error(err.message);
@@ -79,18 +79,21 @@ function insert_user(message){
         });
     });
 }
+function sleep(ms){
+    return new Promise(resolve => setTimeout(resolve,ms))
+}
 
 function respond(message, chat) {
     console.log("hello");
     // After successful insertion, execute the Python script
-    const pythonProcess = spawn('python',['second_script.py', message.body.toString()]);
+    var pythonProcess = spawn('python',['second_script.py', message.body.toString()]);
     pythonProcess.on('close', (code) => {
         console.log(`child process exited with code ${code}`);
     
         // Read file only after Python script has finished
 
         try {
-            var query = `SELECT content FROM messages  WHERE user_id ==? ORDER BY created_at DESC LIMIT 1`;
+            var query = `SELECT content,from_ai FROM messages  WHERE user_id ==? ORDER BY created_at DESC LIMIT 1`;
 
             db.serialize(() => {
                 db.get(query,
@@ -105,9 +108,13 @@ function respond(message, chat) {
                             console.log("empty string returned");
                             chat.sendMessage("La IA pelotuda contesto un string vacio");
                         }
+                        else if (row.from_ai){
+                            console.log(row.content);
+                            chat.sendMessage(row.content);
+                        }
                         else {
                         console.log(row.content);
-                        chat.sendMessage(row.content);
+                        chat.sendMessage("No podemos atenderle en este momento. Por favor espere");
                         }
                     }
                     else {
@@ -121,7 +128,9 @@ function respond(message, chat) {
         }
     });
 }
-client.on('message', async (message) => {
+
+const message_list = []
+async function handleInsertions(message)  {
 
 	if (message.body === '!ping') {
 		await message.reply('pong');
@@ -133,13 +142,72 @@ client.on('message', async (message) => {
             try {
                 await insert_user(message);
                 await insert_message(message);
-                respond(message, chat);
+                message_list.push(message)
+                console.log("waiting for follow-ups (30s)");
+                await sleep(10_000); // wait for possible incoming new messages before responding
+                console.log("waiting for follow-ups (20s)");
+                await sleep(10_000);
+                console.log("waiting for follow-ups (10s)");
+                await sleep(10_000);
+                
+                return chat
+                // respond(message, chat);
             } catch (error) {
                 console.error(error);
             }
-
         }
-    }})
+    }}
+client.on('message', async(message) =>{
+    chat = await handleInsertions(message);
+    if (message === message_list[message_list.length-1]) {
+        respond(message, chat)
+    }
+})
+
+// var all_chats = new Set()
+// async function handleAllInsertions(message){
+//     var_all_chats = new Set()
+//     var chat = await handleInsertions(message);
+//     all_chats.add(chat)
+//     return all_chats
+// }
+
+
+// client.on('message', async(message) =>{
+//     var all_chats = handleAllInsertions(message);
+
+//     for (let this_chat in all_chats){
+//         respond(message, this_chat);
+//         all_chats.delete(this_chat);
+//     }
+// })
+
+
+    // client.on('message', async (message) => {
+
+// 	if (message.body === '!ping') {
+// 		await message.reply('pong');
+// 	}
+//     else
+//     {
+//         var [chat_ready, chat] = await getChatAsync(message);
+//         if (message.from === '5493874034462@c.us' || message.from === '5493874690429@c.us' || chat_ready === true) {
+//             try {
+//                 await insert_user(message);
+//                 await insert_message(message);
+//                 console.log("waiting for follow-ups (30s)");
+//                 await sleep(10_000); // wait for possible incoming new messages before responding
+//                 console.log("waiting for follow-ups (20s)");
+//                 await sleep(10_000);
+//                 console.log("waiting for follow-ups (10s)");
+//                 await sleep(10_000);
+//                 respond(message, chat);
+//             } catch (error) {
+//                 console.error(error);
+//             }
+
+//         }
+//     }})
 
 
 

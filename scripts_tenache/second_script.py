@@ -8,6 +8,13 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
+print("Si se llamo a python, macho")
+
+response_path = os.path.join("\\","Users", "tenache89", "Desktop","llama.cpp","scripts_tenache")
+# response_path = r'C:\Users\tenache89\Desktop\llama.cpp\build\bin\Release\scripts\mensaje.txt'
+with open(response_path,'w') as file:
+    file.write('hola')
+
 table = None
 columnas = None
 informacion = None
@@ -23,15 +30,16 @@ model_folder = os.path.join("\\","Users", "tenache89", "Desktop","llama.cpp", "b
 # model_name = 'llama-2-13b-chat.Q5_K_M.gguf'
 model_name = 'EVAESPANIOLBIENTurdus-trained-20-int8.gguf'
 model_path = os.path.join(model_folder, model_name)
-database_folder = os.path.join("\\","Users","tenache89", "Desktop","llama.cpp","build","bin","Release","scripts")
-database_name = "whatsapp2.db"
+database_folder = os.path.join("\\","Users","tenache89", "Desktop","llama.cpp","scripts_tenache")
+database_name = "whatsapp3.db"
 database_path = os.path.join(database_folder,database_name)
 
 
 model = llama_cpp.Llama(
     model_path=model_path,
     chat_format="llama-2",
-    verbose=False
+    verbose=False,
+    n_ctx=2048
 )
 
 print(f"database_path is {database_path}")
@@ -40,19 +48,27 @@ with sqlite3.connect (database_path) as conn:
     c.execute('''SELECT * FROM messages ORDER BY created_at DESC LIMIT 1''')
     info = c.fetchall()[0]
     user_id = info[1]
-    time_stamp = datetime.strptime(info[-1], '%Y-%m-%d %H:%M:%S')
-    c.execute(f'''SELECT id, user_id, user_name, from_user, from_ai, content FROM messages WHERE user_id=? AND created_at >= datetime({time_stamp}, '{WAIT_TIME}') AND from_user=1 ORDER BY created_at DESC;''', (user_id,))
+    # time_stamp = datetime.strptime(info[-1], '%Y-%m-%d %H:%M:%S')
+    time_stamp = info[-1]
+    query_user = f'''SELECT id, user_id, user_name, from_user, from_ai, content FROM messages WHERE user_id=? AND created_at >= datetime('{time_stamp}', '{WAIT_TIME}') AND from_user=1 ORDER BY created_at DESC;'''
+    print(query_user)
+    c.execute(query_user, (user_id,))
     all_user_messages = c.fetchall()
-    c.execute(f'''SELECT created_at FROM messages WHERE user_id=? AND created_at >= datetime({time_stamp}, '{WAIT_TIME}') AND from_user=1 ORDER BY created_at DESC;''', (user_id,))
+    query_times_user = f'''SELECT created_at FROM messages WHERE user_id=? AND created_at >= datetime('{time_stamp}', '{WAIT_TIME}') AND from_user=1 ORDER BY created_at DESC;'''
+    c.execute(query_times_user, (user_id,))
     all_user_times = c.fetchall()
-    c.execute(f'''SELECT id, user_id, user_name, from_user, from_ai, content FROM messages WHERE user_id=? AND created_at >= datetime({time_stamp}, '{WAIT_TIME}') AND from_user=0 ORDER BY created_at DESC;''', (user_id,))
+    query_ai = f'''SELECT id, user_id, user_name, from_user, from_ai, content FROM messages WHERE user_id=? AND created_at >= datetime('{time_stamp}', '{WAIT_TIME}') AND from_user=0 ORDER BY created_at DESC;'''
+    c.execute(query_ai, (user_id,))
     all_ai_messages = c.fetchall()
-    c.execute(f'''SELECT created_at FROM messages WHERE user_id=? AND created_at >= datetime({time_stamp}, '{WAIT_TIME}') AND from_user=0 ORDER BY created_at DESC;''', (user_id,))
+    query_times_ai = f'''SELECT created_at FROM messages WHERE user_id=? AND created_at >= datetime('{time_stamp}', '{WAIT_TIME}') AND from_user=0 ORDER BY created_at DESC;'''
+    c.execute(query_times_ai, (user_id,))
     all_ai_times = c.fetchall()
     # info = c.fetchall()[0]
 
-all_user_times = all_ai_times = pd.to_datetime(all_user_times)
-all_ai_times = pd.to_datetime(all_ai_times)
+if all_user_times:
+  all_user_times =  pd.to_datetime([t[0] for t in all_user_times])
+if all_ai_times:
+  all_ai_times = pd.to_datetime(t[0] for t in all_ai_times)
 
 all_user_messages_grouped = ""
 next_start = 0
@@ -70,7 +86,7 @@ for i in range(len(all_ai_times)):
     all_user_messages_grouped[i] += messages_now[j]
     
 for message in all_user_messages:
-  all_user_messages_grouped += message
+  all_user_messages_grouped += message[-1]
   
     
 
@@ -147,7 +163,47 @@ if table:
   for info in all_info[1:]:
     informacion += "\n" + str(info)
 
+# messages_info = """Eres un amable asistente de la compañia O.FRE.SER
+# #              y debes responder consultas en base al siguiente mensaje que recibio 
+# #              el cliente:
+# #              'O.FRE.SER - Gestión Integral de Plagas 
 
+# # Señor cliente, le informamos que su servicio en domicilio SAN MARTIN 1233
+# # está programado para el día de mañana a horas 16:45.
+# # Para confirmar su turno deberá comunicarse con nuestro personal de atención al
+# # público.
+
+
+# # De lunes a viernes de 9hs a 20hs, sábado de 9hs a 13hs.
+
+# # Tel: 4212368
+# # Cel: 387528693
+
+# # Puede abonar por transferencia o por tarjeta de credito llamando a alguno de
+# # los numeros proporcionados.
+
+# # Por consultas o sugerencias, comunicarse vía whatsapp
+# # ====> https://wa.me/5493875286093
+
+# # IMPORTANTE
+# # Por favor agende éste número para poder seguir recibiendo este tipo de
+# # notificaciones.
+# # Segumos trabajando para mejorar nuestros servicios.
+
+# # Muchas gracias
+# # Área Administración y Logística' """,
+#             ("human", "Hola, ¿Como puedo abonar?"),
+#             ("ai", "¡Hola!, puede abonar comunicandose con los numeros proporcionados."),
+#             ("human", "{user_input}"),
+#         ])
+# prompt = ChatPromptTemplate.from_messages([
+#             ("system", """Eres un apasionado biologo de focas y respondes a las preguntas
+#                 sobre las focas en menos de 70 palabras con felicidad y siempre terminas las oraciones con 'FISBH!'"""),
+#             ("human", "¿Que son las focas?"),
+#             ("ai", "Las focas o fócidos, focas verdaderas (Phocidae) son los animales mas lindos de la tierra FIBSH!!"),
+#             ("human", "{user_input}"),
+#             ("ai",""),
+#         ])
 messages_info = [
   {
     "role":"system",
@@ -160,7 +216,6 @@ messages_info = [
     {columnas}
     {informacion}
     Contesta en menos de 35 palabras. 
-    Empieza con: 'Soy la IA de Thomas'
     """
   },
   {
@@ -242,14 +297,17 @@ print(f"response is {response}")
 
 
 # DO NOT ELIMINATE FOLLOWING LINES!!!!!!
-# message_id = info[0] + "_ai"
-# print(f"response is {response}")
-# values = (message_id,info[1],info[2],0,1,response)
-# with sqlite3.connect(database_path) as conn:
-#     c = conn.cursor()
-#     c.execute(f'''INSERT INTO messages (id, user_id, user_name, from_user, from_ai, content) VALUES (?, ?, ?, ?, ?, ?);''', values)
+#### THE FOLLOWING LINES INSERT THE RESPONSE INTO THE DATABASE
+message_id = info[0] + "_ai"
+print(f"response is {response}")
+values = (message_id,info[1],info[2],0,1,response)
+with sqlite3.connect(database_path) as conn:
+    c = conn.cursor()
+    c.execute(f'''INSERT INTO messages (id, user_id, user_name, from_user, from_ai, content) VALUES (?, ?, ?, ?, ?, ?);''', values)
+## DO NOT ELIMINATE !!!!!
 
-response_path = r'C:\Users\tenache89\Desktop\llama.cpp\build\bin\Release\scripts\mensaje.txt'
+response_path = os.path.join("\\","Users", "tenache89", "Desktop","llama.cpp","scripts_tenache")
+# response_path = r'C:\Users\tenache89\Desktop\llama.cpp\build\bin\Release\scripts\mensaje.txt'
 with open(response_path,'w') as file:
     file.write(response)
 
