@@ -1,31 +1,37 @@
+print("Up to line one, we're fine")
 import llama_cpp
 import os
 import sys
 # import FastAPI
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
+from auxiliary_funcs import extract_json_from_string, extract_from_database, transform_to_datetime
 
-print("Si se llamo a python, macho")
+
+
+print("Up to line 12, we're fine")
 
 response_path = os.path.join("\\","Users", "tenache89", "Desktop","llama.cpp","scripts_tenache")
 # response_path = r'C:\Users\tenache89\Desktop\llama.cpp\build\bin\Release\scripts\mensaje.txt'
-with open(response_path,'w') as file:
-    file.write('hola')
+# with open(response_path,'w') as file:
+#     file.write('hola')
 
 table = None
 columnas = None
 informacion = None
 TELEFONO = '3875377223'
-WAIT_TIME = "-5 hours"
+WAIT_TIME = "-5 minutes"
+TABLE = "messages"
 # app = FastAPI(
 #     title="Chatbot server",
 #     version="1.0",
 #     description="A simple api server using llama's piRunnable interfaces",
 # )
 
+print("up to line 30, we're fine")
 model_folder = os.path.join("\\","Users", "tenache89", "Desktop","llama.cpp", "build", "bin", "Release") 
 # model_name = 'llama-2-13b-chat.Q5_K_M.gguf'
 model_name = 'EVAESPANIOLBIENTurdus-trained-20-int8.gguf'
@@ -34,42 +40,24 @@ database_folder = os.path.join("\\","Users","tenache89", "Desktop","llama.cpp","
 database_name = "whatsapp3.db"
 database_path = os.path.join(database_folder,database_name)
 
+print("up to line 39, we're fine")
 
 model = llama_cpp.Llama(
     model_path=model_path,
     chat_format="llama-2",
     verbose=False,
-    n_ctx=2048
+    n_ctx=800
 )
 
 print(f"database_path is {database_path}")
-with sqlite3.connect (database_path) as conn:
-    c = conn.cursor()
-    c.execute('''SELECT * FROM messages ORDER BY created_at DESC LIMIT 1''')
-    info = c.fetchall()[0]
-    user_id = info[1]
-    # time_stamp = datetime.strptime(info[-1], '%Y-%m-%d %H:%M:%S')
-    time_stamp = info[-1]
-    query_user = f'''SELECT id, user_id, user_name, from_user, from_ai, content FROM messages WHERE user_id=? AND created_at >= datetime('{time_stamp}', '{WAIT_TIME}') AND from_user=1 ORDER BY created_at DESC;'''
-    print(query_user)
-    c.execute(query_user, (user_id,))
-    all_user_messages = c.fetchall()
-    query_times_user = f'''SELECT created_at FROM messages WHERE user_id=? AND created_at >= datetime('{time_stamp}', '{WAIT_TIME}') AND from_user=1 ORDER BY created_at DESC;'''
-    c.execute(query_times_user, (user_id,))
-    all_user_times = c.fetchall()
-    query_ai = f'''SELECT id, user_id, user_name, from_user, from_ai, content FROM messages WHERE user_id=? AND created_at >= datetime('{time_stamp}', '{WAIT_TIME}') AND from_user=0 ORDER BY created_at DESC;'''
-    c.execute(query_ai, (user_id,))
-    all_ai_messages = c.fetchall()
-    query_times_ai = f'''SELECT created_at FROM messages WHERE user_id=? AND created_at >= datetime('{time_stamp}', '{WAIT_TIME}') AND from_user=0 ORDER BY created_at DESC;'''
-    c.execute(query_times_ai, (user_id,))
-    all_ai_times = c.fetchall()
-    # info = c.fetchall()[0]
 
-if all_user_times:
-  all_user_times =  pd.to_datetime([t[0] for t in all_user_times])
-if all_ai_times:
-  all_ai_times = pd.to_datetime(t[0] for t in all_ai_times)
 
+
+all_user_messages, all_ai_messages, all_user_times, all_ai_times, message_info = extract_from_database(database_path, TABLE, WAIT_TIME)
+
+all_user_times, all_ai_times = transform_to_datetime(all_user_times, all_ai_times)
+
+print("up to line 76, we're fine")
 all_user_messages_grouped = ""
 next_start = 0
 
@@ -77,31 +65,27 @@ if len(all_ai_times):
   sections = len(all_ai_times)
 else:
   sections = 1
-  
-for i in range(len(all_ai_times)):
+
+all_user_messages = pd.Series(all_user_messages)
+
+
+for i in range(sections):
   all_user_messages_grouped += "\n"
-  messages_now = all_user_messages[next_start:][all_user_times - all_ai_times[i] > 0]
+  index = all_user_times - all_ai_times[i] > timedelta(days=0)
+  
+  messages_now = all_user_messages[next_start:][index[next_start:]]
   next_start = len(messages_now)
-  for j in messages_now:
-    all_user_messages_grouped[i] += messages_now[j]
+  for j in range(messages_now.shape[0]):
+    all_user_messages_grouped+= messages_now.iloc[j][-1]
     
-for message in all_user_messages:
-  all_user_messages_grouped += message[-1]
+# for message in all_user_messages:
+#   all_user_messages_grouped += message[-1]
   
     
 
+print("up to line 97 we're fine")
 
 
-  
-
-
-
-print(f"info is {info}")
-print(f"type(info) is {type(info)}")
-
-print()
-content = info[5]
-pregunta = "Hola"
 
 messages0 =[
   {
@@ -112,18 +96,19 @@ messages0 =[
     Debes determinar si puedes ayudar con la pregunta, cual de las categorias responderia la pregunta, y si se requieren preguntas adicionales
     Debes responder en format json, con las claves:
     es_pregunta?: donde el valor sera un booleano (true o false). Esto sera verdadero si el usuario no hizo una pregunta concreta. 
-    
-    puedo_ayudar: donde el valor sera un booleano: true o false
-    informacion_requerida: donde debes responder con una de las categorias de informacion dadas anteriormente. o null si no puedes contestar.      
+        
+    puedo_ayudar: donde el valor sera un booleano: true o false. Si el valor de es_pregunta? es false, puedo_ayudar tambien debe
+    informacion_requerida: null si ninguna de las categorias ayudara a responder la pregunta. De lo contrario, responde con una de las categorias.        
     Responde solo el objeto JSON, en el siguiente formato. 
-    {"es_pregunta?":bool, "puedo_ayudar":str,"informacion_requerida":str}
+    {"es_pregunta?":bool, "puedo_ayudar":bool,"informacion_requerida":str}
     """  
     },
   {
     "role":"user",
-    "content":pregunta
+    "content":all_user_messages_grouped
   }
 ]
+print("up to line 129, we're fine")
 
 start = datetime.now()
 chat_completion0 = model.create_chat_completion(
@@ -134,16 +119,59 @@ chat_completion0 = model.create_chat_completion(
     response_format={"type":"json_object"}
 )
 
+time_to_boot = datetime.now() - start
+print(f"It took {time_to_boot} to start the model")
+
 print(f"La LLM tomo {datetime.now() - start}")
+response0_no_strip = chat_completion0['choices'][0]['message']['content']
 response0 = chat_completion0['choices'][0]['message']['content'].strip()
 
-try:
-  json_dict = json.loads(response0)
-except Exception as err:
-  print(err)
-  print(f"response0 is {response0}")
+
   
-table = json_dict['informacion_requerida']
+response0 = extract_json_from_string(response0)
+
+messages_json = [
+  {
+    "role":"system",
+    "content":"""Tu funcion es devolver un objeto JSON a partir de los datos que se te brindaran.
+   El objeto JSON debe tener la siguiente estructura:
+   {"es_pregunta?":bool, "puedo_ayudar":bool,"informacion_requerida":str}
+   Algunos ejemplos :
+   {"es_pregunta?":true,"puedo_ayudar":true,"informacion_requerida":Horarios}
+   {"es_pregunta?":false,"puedo_ayudar":false,"informacion_requerida":null}
+   {"es_pregunta?":true,"puedo_ayudar":false,"informacion_requerida":null}
+   {"es_pregunta?":false,"puedo_ayudar":true,"informacion_requerida":null}
+   {"es_pregunta?":true,"puedo_ayudar":true,"informacion_requerida":Gustos}
+   Recuerda hacerlo a partir de la informacion que te brinde el usuario
+   """
+   },
+  {
+    "role":"user",
+    "content":f"{response0}"
+  }
+]
+
+
+for _ in range(2):
+  try:
+    json_dict = json.loads(response0)
+    break
+  except Exception as err:
+    print(err)
+    print(f"response0 is {response0}")
+    print(f"trying to extract from json")
+    response0 = model.create_chat_completion(
+      messages = messages_json,
+      temperature=0.25,
+      max_tokens=5000
+    )['choices'][0]['message']['content'].strip()
+    extract_json_from_string(response0)
+    json_dict = {}
+
+print(f"response0 is {response0}")
+
+if json_dict:
+  table = json_dict['informacion_requerida']
   
 info_data_name = 'info.db'
 info_data_path = os.path.join(database_folder, info_data_name)
@@ -163,47 +191,6 @@ if table:
   for info in all_info[1:]:
     informacion += "\n" + str(info)
 
-# messages_info = """Eres un amable asistente de la compañia O.FRE.SER
-# #              y debes responder consultas en base al siguiente mensaje que recibio 
-# #              el cliente:
-# #              'O.FRE.SER - Gestión Integral de Plagas 
-
-# # Señor cliente, le informamos que su servicio en domicilio SAN MARTIN 1233
-# # está programado para el día de mañana a horas 16:45.
-# # Para confirmar su turno deberá comunicarse con nuestro personal de atención al
-# # público.
-
-
-# # De lunes a viernes de 9hs a 20hs, sábado de 9hs a 13hs.
-
-# # Tel: 4212368
-# # Cel: 387528693
-
-# # Puede abonar por transferencia o por tarjeta de credito llamando a alguno de
-# # los numeros proporcionados.
-
-# # Por consultas o sugerencias, comunicarse vía whatsapp
-# # ====> https://wa.me/5493875286093
-
-# # IMPORTANTE
-# # Por favor agende éste número para poder seguir recibiendo este tipo de
-# # notificaciones.
-# # Segumos trabajando para mejorar nuestros servicios.
-
-# # Muchas gracias
-# # Área Administración y Logística' """,
-#             ("human", "Hola, ¿Como puedo abonar?"),
-#             ("ai", "¡Hola!, puede abonar comunicandose con los numeros proporcionados."),
-#             ("human", "{user_input}"),
-#         ])
-# prompt = ChatPromptTemplate.from_messages([
-#             ("system", """Eres un apasionado biologo de focas y respondes a las preguntas
-#                 sobre las focas en menos de 70 palabras con felicidad y siempre terminas las oraciones con 'FISBH!'"""),
-#             ("human", "¿Que son las focas?"),
-#             ("ai", "Las focas o fócidos, focas verdaderas (Phocidae) son los animales mas lindos de la tierra FIBSH!!"),
-#             ("human", "{user_input}"),
-#             ("ai",""),
-#         ])
 messages_info = [
   {
     "role":"system",
@@ -215,12 +202,13 @@ messages_info = [
     Informacion requerida (tienes columnas mas informacion):
     {columnas}
     {informacion}
-    Contesta en menos de 35 palabras. 
+    Contesta en menos de 50 palabras. 
+    Empieza con Soy la IA de Thomas
     """
   },
   {
     "role":"user",
-    "content": pregunta
+    "content": all_user_messages_grouped
   }
 ]
 
@@ -238,7 +226,7 @@ messages_no_info = [
   },
   {
     "role":"user",
-    "content": pregunta
+    "content": all_user_messages_grouped
   }
 ]
 
@@ -247,15 +235,18 @@ messages_more_info = [
     "role":"system",
     "content":f"""
     Eres el asistente de Thomas. Debes responder de manera amable a una persona que quiere saber de Thomas. 
-    Todavia no sabes si puedes brindar la informacion necesaria. Esta es la informacion que posees: 
+    Todavia no sabes cual es la pregunta del usuario, y tu tarea es determinarla. 
+    Esta es la informacion que hay disponible: 
     {{Amigos, Gustos, Hobbies, Horarios, LibrosFavoritos, PeliculasFavoritas}}
+    La categoria LibrosFavoritos contiene una lista de libros favoritos y sus autores. 
+    La categoria PeliculasFavoritas contiene una lista de peliculas favoritas y sus directores
     Haz mas preguntas para determinar si puedes ayudar con la informacion que tienes.
     Empieza con: 'Soy la IA de Thomas' 
     """
   },
   {
     "role":"user",
-    "content": pregunta
+    "content": all_user_messages_grouped
   }
 ]
   
@@ -269,7 +260,7 @@ if table:
     temperature = 0,
     max_tokens=5000
   )
-elif not json_dict['es_pregunta?']:
+elif not json_dict.get('es_pregunta?', False):
     chat_completion = model.create_chat_completion(
     messages = messages_more_info,
     temperature=0.25,
@@ -290,17 +281,14 @@ response = chat_completion['choices'][0]['message']['content'].strip()
 print(f"response is {response}")
 
 
-
-
-
 #info.id, info.user_id, 0, 1, response,
 
 
 # DO NOT ELIMINATE FOLLOWING LINES!!!!!!
 #### THE FOLLOWING LINES INSERT THE RESPONSE INTO THE DATABASE
-message_id = info[0] + "_ai"
-print(f"response is {response}")
-values = (message_id,info[1],info[2],0,1,response)
+message_id = message_info[0] + "_ai"
+# print(f"response is {response}")
+values = (message_id,message_info[1],message_info[2],0,1,response)
 with sqlite3.connect(database_path) as conn:
     c = conn.cursor()
     c.execute(f'''INSERT INTO messages (id, user_id, user_name, from_user, from_ai, content) VALUES (?, ?, ?, ?, ?, ?);''', values)
@@ -308,8 +296,8 @@ with sqlite3.connect(database_path) as conn:
 
 response_path = os.path.join("\\","Users", "tenache89", "Desktop","llama.cpp","scripts_tenache")
 # response_path = r'C:\Users\tenache89\Desktop\llama.cpp\build\bin\Release\scripts\mensaje.txt'
-with open(response_path,'w') as file:
-    file.write(response)
+# with open(response_path,'w') as file:
+#     file.write(response)
 
 
 # print(model("The quick brown fox jumps ", stop=["."])["choices"][0]["text"])
