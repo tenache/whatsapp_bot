@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
-from auxiliary_funcs import extract_json_from_string, extract_from_database, transform_to_datetime
+from auxiliary_funcs import extract_json_from_string, extract_from_database, transform_to_datetime, get_info_for_ai
 
 
 
@@ -175,21 +175,10 @@ if json_dict:
   
 info_data_name = 'info.db'
 info_data_path = os.path.join(database_folder, info_data_name)
+
 if table: 
-  with sqlite3.connect(info_data_path) as conn:
-    c = conn.cursor()
-    c.execute(f'''SELECT * FROM {table}''')
-    all_info = c.fetchall()
-    column_names = [description[0] for description in c.description]
-    info = all_info[0]
+  informacion, columnas = get_info_for_ai(info_data_path, table)
 
-  columnas = column_names[0]
-  for column in column_names[1:]:
-    columnas += "," + column
-  informacion = str(all_info[0])
-
-  for info in all_info[1:]:
-    informacion += "\n" + str(info)
 
 messages_info = [
   {

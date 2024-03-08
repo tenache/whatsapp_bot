@@ -1,3 +1,4 @@
+// TODO: Hacer que no lea el u
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const client = new Client({
@@ -83,10 +84,13 @@ function sleep(ms){
     return new Promise(resolve => setTimeout(resolve,ms))
 }
 
+const python_path = "C:\\thibbard\\envs\\prompt_engineering\\Scripts\\python.exe"
+// const python_path = "C:\\Users\\tenache89\\miniconda3\\python.exe"
 function respond(message, chat) {
-    console.log("hello");
+    console.log("About to begin the python process");
     // After successful insertion, execute the Python script
-    var pythonProcess = spawn('python',['second_script.py', message.body.toString()]);
+    var pythonProcess = spawn("python",['script_ofreser.py']);
+    pythonProcess.stdout.on('data',(data) => {console.log(`stdout: ${data}`)})
     pythonProcess.on('close', (code) => {
         console.log(`child process exited with code ${code}`);
     
@@ -138,17 +142,19 @@ async function handleInsertions(message)  {
     else
     {
         var [chat_ready, chat] = await getChatAsync(message);
-        if (message.from === '5493874034462@c.us' || message.from === '5493874690429@c.us' || chat_ready === true) {
+        if (message.from === '5493874034462@c.us' || message.from === '5493874149123@c.us' || message.from === '5493874690429@c.us' || chat_ready === true & message.type == "TEXT") {
             try {
                 await insert_user(message);
                 await insert_message(message);
                 message_list.push(message)
+                console.log("waiting for follow-ups (45s)");
+                await sleep(15_000); // wait for possible incoming new messages before responding
                 console.log("waiting for follow-ups (30s)");
-                await sleep(10_000); // wait for possible incoming new messages before responding
+                await sleep(10_000);
                 console.log("waiting for follow-ups (20s)");
                 await sleep(10_000);
-                console.log("waiting for follow-ups (10s)");
-                await sleep(10_000);
+                console.log("waiting for follow-ups (10s)")
+                await sleep (10_000)
                 
                 return chat
                 // respond(message, chat);
